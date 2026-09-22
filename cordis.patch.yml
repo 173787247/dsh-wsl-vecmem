@@ -1,0 +1,10 @@
+- insert:
+    - id: dsh-wsl-vecmem
+      name: dsh-wsl-vecmem
+      config:
+        enabled: true
+        storePath: ""
+        ollamaBase: "http://127.0.0.1:11434"
+        embedModel: "nomic-embed-text"
+        timeoutMs: 60000
+        maxItems: 5000
