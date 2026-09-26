@@ -20,7 +20,7 @@ export function apply(ctx, config = {}) {
   ctx.systemPrompt.section({
     name: "tool:vecmem",
     order: 131,
-    text: "dsh-wsl-vecmem stores short text snippets with Ollama embeddings in ~/.dsh/vecmem. Use for project crumbs — not a replacement for Obsidian. Needs an embedding model (default nomic-embed-text).",
+    text: "dsh-wsl-vecmem stores short text snippets with Ollama embeddings in ~/.dsh/vecmem. Pass workspace to namespace crumbs (e.g. im:feishu). Use for project crumbs — not a replacement for Obsidian. Needs an embedding model (default nomic-embed-text).",
   });
 
   const timeoutMs = positive(config.timeoutMs, 60_000);
@@ -41,13 +41,14 @@ export function apply(ctx, config = {}) {
 
   ctx.tools.register({
     name: "vecmem_add",
-    description: "Embed and store a text snippet locally.",
+    description: "Embed and store a text snippet locally. Optional workspace namespaces into meta.workspace.",
     parameters: {
       type: "object",
       additionalProperties: false,
       required: ["text"],
       properties: {
         text: { type: "string" },
+        workspace: { type: "string", description: "Optional namespace stored as meta.workspace (e.g. im:feishu)." },
         meta: { type: "object", additionalProperties: true },
       },
     },
@@ -67,13 +68,14 @@ export function apply(ctx, config = {}) {
 
   ctx.tools.register({
     name: "vecmem_search",
-    description: "Semantic search over local vector memory.",
+    description: "Semantic search over local vector memory. Optional workspace filters by meta.workspace.",
     parameters: {
       type: "object",
       additionalProperties: false,
       required: ["query"],
       properties: {
         query: { type: "string" },
+        workspace: { type: "string", description: "If set, only search items with matching meta.workspace." },
         topK: { type: "number" },
       },
     },
@@ -100,6 +102,30 @@ export function apply(ctx, config = {}) {
     },
     presentCall: () => ({ card: "generic", title: "Vecmem search" }),
     presentResult: (_a, r) => ({ card: "generic", title: "Vecmem search", content: r.content }),
+  });
+
+  ctx.tools.register({
+    name: "vecmem_clear",
+    description: "Clear local vector memory. With workspace, removes only that meta.workspace; otherwise clears all.",
+    parameters: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        workspace: { type: "string", description: "If set, only remove items with matching meta.workspace." },
+      },
+    },
+    output: { schema: { type: "object", additionalProperties: true }, render: (_a, v) => [{ type: "text", text: JSON.stringify(v) }] },
+    timeoutMs: 10_000,
+    isConcurrencySafe: () => false,
+    async execute(args) {
+      try {
+        return vm.clear(args || {});
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      }
+    },
+    presentCall: () => ({ card: "generic", title: "Vecmem clear" }),
+    presentResult: (_a, r) => ({ card: "generic", title: "Vecmem clear", content: r.content }),
   });
 
   void cosine;
