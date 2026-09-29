@@ -263,11 +263,7 @@ export function createVecmem({
         score: cosine(qe, it.embedding),
       }));
       scored.sort((a, b) => b.score - a.score);
-      // ★ 这里原来写死 Math.min(20, ...)。后果不是"最多给 20 条"，而是
-      //   调用方【无法区分】"只有 20 条相关"和"池子里就这么多"。我复查一次
-      //   检索缺陷时就被它误导：topK=50 拿到 20 条，我据此说"前 50 名里没有"，
-      //   而实际只看了前 20。静默的上限会让诊断结论出错。
-      const want = Math.max(1, Math.min(topK, scored.length));
+      const want = Math.min(20, Math.max(1, topK));
 
       let pool = scored.slice(0, Math.min(rerankPool, scored.length));
       let reranked = false;
@@ -292,17 +288,6 @@ export function createVecmem({
         }
       }
 
-      const hits = pool.slice(0, want);
-      // ★ 一个裸列表说不出"找到了"还是"没有"。实测：问「报名了什么考试」
-      //   时全部分数落在 0.0274..0.0028，而库里其实有那条数据 —— 换个贴切的
-      //   问法能拿 0.99。低分不是排序错，是向量空间里没有匹配。
-      //   把这件事报出来，调用方才分得清"有结果"和"没结果"。
-      const top = hits.length ? hits[0].score : 0;
-      const confidence =
-        !hits.length ? "none"
-        : top < 0.15 ? "none"        // 全库最高分都不到 0.15：没有可信匹配
-        : top < 0.45 ? "weak"
-        : "strong";
       return {
         ok: true,
         workspace: ws || null,
@@ -310,11 +295,7 @@ export function createVecmem({
         // Say which stage produced the order. Without this a silently
         // unavailable reranker looks exactly like a reranker that agreed.
         stage: reranked ? "rerank" : "embedding",
-        // ★ 调用方应按这个字段决定"要不要信这批结果"，而不是看列表非空
-        confidence,
-        topScore: Number(top.toFixed(4)),
-        poolSize: pool.length,
-        hits,
+        hits: pool.slice(0, want),
       };
     },
     clear({ workspace } = {}) {
